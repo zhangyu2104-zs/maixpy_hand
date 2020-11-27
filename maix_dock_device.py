@@ -19,6 +19,7 @@ import KPU as kpu
 
 class Maix_dock_device:
 
+    TOF10120_addr   =   0x52
     VL53L0X_addr    =   0x29
     memaddr         =   0xc2
     nbytes          =   1
@@ -30,6 +31,7 @@ class Maix_dock_device:
     VL53L0X_REG_RESULT_RANGE_STATUS         =   0x14
     VL53L0X_REG_SYSRANGE_START              =   0x00
     pcf8591_addr    =   0x48
+    #pcf8591_addr    =   0x4f
 
 
     fm.register( 1,fm.fpioa.GPIO0)
@@ -76,6 +78,7 @@ class Maix_dock_device:
         self.temperature_sensor_right   = 0
         self.ad48v                      = 0
         self.face_detection             = 0
+        self.readAdd_times              = 0
 
 
     def set_face_detection(self):
@@ -150,6 +153,7 @@ class Maix_dock_device:
         try:
             self.i2c.writeto_mem(0x29,0x00,chr(1))
             time.sleep_ms(10)
+            #time.sleep_ms(40)
             data_i2c = self.i2c.readfrom_mem(0x29,0x1e,2)
             data_i2c = data_i2c[0]<< 8 | data_i2c[1]
             if data_i2c != 20:
@@ -169,10 +173,9 @@ class Maix_dock_device:
     def set_infrared_range_right(self):
         try:
             self.i2c_extend.writeto_mem(0x29,0x00,chr(1))
-            #self.i2c_extend.writeto_mem(0x21,0x00,chr(1))
             time.sleep_ms(10)
+            #time.sleep_ms(40)
             data_i2c = self.i2c_extend.readfrom_mem(0x29,0x1e,2)
-            #data_i2c = self.i2c_extend.readfrom_mem(0x21,0x1e,2)
             data_i2c = data_i2c[0]<< 8 | data_i2c[1]
             if data_i2c != 20:
                 self.infrared_range_right = data_i2c
@@ -200,8 +203,8 @@ class Maix_dock_device:
                 self.i2c.writeto(self.pcf8591_addr, chr(0x43))
             self.i2c.readfrom(self.pcf8591_addr, 1)
             ad_value    =   self.i2c.readfrom(self.pcf8591_addr, 1)
-            ad_value    =   ad_value[0]*48/255
-            self.ad48v   =   ad_value
+            ad_value    =   ad_value[0]*58/255
+            self.ad48v   =   ad_value-1.2
             return ad_value
         except OSError as err:
             if err.args[0] == errno.EIO:
@@ -212,8 +215,31 @@ class Maix_dock_device:
         self.set_ad48v_chl(0)
 
 
+    def set_tof10120_left(self):
+        try:
+            data_i2c = self.i2c.readfrom_mem(self.TOF10120_addr,0x00,2)
+            dis_left    =   data_i2c[0]*256 + data_i2c[1]
+            print("dis_left",'%d'%dis_left)
+        except OSError as err:
+            if err.args[0] == errno.EIO:
+                print("i2c1 tof10120_left errno.EIO")
+
+
+    def set_tof10120_right(self):
+        try:
+            data_i2c = self.i2c.readfrom_mem(self.TOF10120_addr+1,0x00,2)
+            dis_right    =   data_i2c[0]*256 + data_i2c[1]
+            print("dis_left",'%d'%dis_right)
+        except OSError as err:
+            if err.args[0] == errno.EIO:
+                print("i2c1 tof10120_right errno.EIO")
+
+
     def uvc_autoControl(self):
-        tempBorder_times = 0
+        tempBorder_times    =   0
+        if self.readAdd_times == 0:
+            self.readAdd_times += 1
+            self.show_deviceAddr()
         self.set_infrared_range_left()
         utime.sleep_ms(200)
         self.set_ad48v()
@@ -252,9 +278,11 @@ class Maix_dock_device:
 
 def main():
     myDevice = Maix_dock_device()
-    myDevice.show_deviceAddr()
+    #myDevice.show_deviceAddr()
     while True :
+    #while False :
         myDevice.uvc_autoControl()
+        #myDevice.set_tof10120_left()
         time.sleep_ms(500)
 
     #a = kpu.deinit(myDevice.task)

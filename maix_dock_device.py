@@ -55,7 +55,7 @@ class Maix_dock_device:
     tempBorder_times = 0
 
 
-    lcd.init()
+    #lcd.init()
     sensor.reset()
     sensor.set_pixformat(sensor.RGB565)
     sensor.set_framesize(sensor.QVGA)
@@ -87,7 +87,7 @@ class Maix_dock_device:
         if code:
             for i in code:
                 #print(i)
-                #a = img.draw_rectangle(i.rect())
+                a = img.draw_rectangle(i.rect())
                 print("find face")
                 self.face_detection =   1
         else:
@@ -195,24 +195,35 @@ class Maix_dock_device:
         try:
             if chn == 0:
                 self.i2c.writeto(self.pcf8591_addr, chr(0x40))
+                self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   ad_value[0]*58/255
+                self.ad48v   =   ad_value-1.2
+                return ad_value
             if chn == 1:
                 self.i2c.writeto(self.pcf8591_addr, chr(0x41))
+                self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   3.3*ad_value[0]/255
+                self.ad48v   =    -61.44*ad_value + 174.4
+                return ad_value
             if chn == 2:
                 self.i2c.writeto(self.pcf8591_addr, chr(0x42))
+                self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   self.i2c.readfrom(self.pcf8591_addr, 1)
+                ad_value    =   3.3*ad_value[0]/255
+                self.ad48v   =    -61.44*ad_value + 174.4
+                return ad_value
             if chn == 3:
                 self.i2c.writeto(self.pcf8591_addr, chr(0x43))
-            self.i2c.readfrom(self.pcf8591_addr, 1)
-            ad_value    =   self.i2c.readfrom(self.pcf8591_addr, 1)
-            ad_value    =   ad_value[0]*58/255
-            self.ad48v   =   ad_value-1.2
-            return ad_value
+
         except OSError as err:
             if err.args[0] == errno.EIO:
                 print("i2c1 ad errno.EIO")
 
 
-    def set_ad48v(self):
-        self.set_ad48v_chl(0)
+    def set_ad48v(self,chn):
+        self.set_ad48v_chl(chn)
 
 
     def set_tof10120_left(self):
@@ -242,13 +253,13 @@ class Maix_dock_device:
             self.show_deviceAddr()
         self.set_infrared_range_left()
         utime.sleep_ms(200)
-        self.set_ad48v()
+        self.set_ad48v(0)
         utime.sleep_ms(200)
         self.set_infrared_range_right()
         utime.sleep_ms(200)
         self.set_face_detection()
         if self.get_keyValue_start():
-            if((self.get_face_detection() == 0) and (self.get_ad48v() > 36)):
+            if((self.get_face_detection() == 0) and (self.get_ad48v(0) > 36)):
                 if((tempBorder_times<=3) and ((self.get_infrared_range_left()<500) or (self.get_infrared_range_right()<500))):
                     self.set_UVC_OUT(1);
                     self.set_led(1);
@@ -267,13 +278,19 @@ class Maix_dock_device:
         print("infrared_range_right = ",self.get_infrared_range_right())
         print("ad48v = ",self.get_ad48v())
         print("face_detection = ",self.get_face_detection())
+        self.set_ad48v(1)
+        tempBorder1 = self.get_ad48v()
+        print("temp_left  = ",tempBorder1)
+        self.set_ad48v(2)
+        tempBorder2 = self.get_ad48v()
+        print("temp_right  = ",tempBorder2)
 
-        #if(get_temperature_sensor_left()>70):
-            #tempBorder_times += 1;
-            #if(tempBorder_times>3):
-                #tempBorder_times=4;
-        #else:
-            #tempBorder_times = 0
+        if(tempBorder1>70 or tempBorder2>70):
+            tempBorder_times += 1;
+            if(tempBorder_times>3):
+                tempBorder_times=4;
+        else:
+            tempBorder_times = 0
 
 
 def main():
